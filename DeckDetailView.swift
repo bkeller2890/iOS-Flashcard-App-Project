@@ -13,6 +13,10 @@ struct DeckDetailView: View {
     @State private var currentIndex = 0
     @State private var showingAnswer = false
     @State private var showingAddCard = false
+    @State private var showingRemoveFlashcards = false
+    @State private var lastDeletedCards: [FlashcardStruct] = []
+    @State private var lastDeletedOffsets: IndexSet = IndexSet()
+    @State private var showingUndoAlert = false
     
     var body: some View {
         VStack {
@@ -52,15 +56,78 @@ struct DeckDetailView: View {
         }
         .navigationTitle(deck.name)
         .toolbar {
-            Button(action: { showingAddCard = true }) {
-                Image(systemName: "plus")
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { showingRemoveFlashcards = true }) {
+                    Image(systemName: "trash")
+                }
             }
-            .sheet(isPresented: $showingAddCard) {
-                AddFlashcardView { question, answer in
-                    store.addFlashcard(to: deck, question: question, answer: answer)
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { showingAddCard = true }) {
+                    Image(systemName: "plus")
                 }
             }
         }
+        // Present add / remove sheets from the view so they have the correct bindings
+        .sheet(isPresented: $showingAddCard) {
+            AddFlashcardView { question, answer in
+                store.addFlashcard(to: deck, question: question, answer: answer)
+            }
+        }
+        .sheet(isPresented: $showingRemoveFlashcards) {
+            RemoveFlashcardView(flashcards: flashcardsBinding) { deleted, offsets in
+                // capture for undo
+                lastDeletedCards = deleted
+                lastDeletedOffsets = offsets
+                // show undo option
+                showingUndoAlert = true
+            }
+        }
+        .alert("Cards deleted", isPresented: $showingUndoAlert) {
+            Button("Undo", role: .cancel) {
+                undoDeletion()
+            }
+            Button("OK", role: .none) {
+                // clear buffer if user accepts deletion
+                lastDeletedCards = []
+                lastDeletedOffsets = IndexSet()
+            }
+        } message: {
+            Text("Flashcards were deleted. Undo?")
+        }
+    }
+
+    /// Binding that points to this deck's flashcards inside the store.
+    /// Falls back to an empty constant array if the deck isn't found.
+    private var flashcardsBinding: Binding<[FlashcardStruct]> {
+        if let idx = store.decks.firstIndex(where: { $0.id == deck.id }) {
+            return Binding(
+                get: { store.decks[idx].flashcards },
+                set: { store.decks[idx].flashcards = $0 }
+            )
+        } else {
+            return .constant([])
+        }
+    }
+
+    // If the user chooses undo, reinsert deleted cards at the appropriate offsets
+    private func undoDeletion() {
+        guard !lastDeletedCards.isEmpty,
+              let idx = store.decks.firstIndex(where: { $0.id == deck.id }) else { return }
+
+        // Rebuild the deck's flashcards inserting each deleted card at the first offset
+        // Note: For simplicity, insert deleted items at the start of the first offset.
+        var cards = store.decks[idx].flashcards
+        // Sort offsets and pair them with deleted items; insert in increasing order
+        let sortedOffsets = lastDeletedOffsets.sorted()
+        for (i, offset) in sortedOffsets.enumerated() {
+            let item = i < lastDeletedCards.count ? lastDeletedCards[i] : lastDeletedCards.last!
+            let insertIndex = min(offset, cards.count)
+            cards.insert(item, at: insertIndex)
+        }
+        store.decks[idx].flashcards = cards
+        // clear the undo buffer
+        lastDeletedCards = []
+        lastDeletedOffsets = IndexSet()
     }
     
     private func goToNextCard() {

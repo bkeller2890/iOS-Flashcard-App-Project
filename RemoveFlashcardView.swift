@@ -16,6 +16,9 @@ struct RemoveFlashcardView: View {
     // The @Binding connects this view to the array of flashcards stored in a parent view.
     @Binding var flashcards: [FlashcardStruct]
     
+    /// Optional callback to notify a parent about what was deleted (cards and their offsets)
+    var onDelete: (([FlashcardStruct], IndexSet) -> Void)? = nil
+    
     var body: some View {
         NavigationView {
             List {
@@ -53,8 +56,12 @@ struct RemoveFlashcardView: View {
     /// Function to handle the list deletion operation.
     /// It receives an IndexSet of items to be removed.
     func deleteFlashcards(offsets: IndexSet) {
-        // This line updates the bound array, deleting the selected elements.
-        flashcards.remove(atOffsets: offsets)
+    // Capture deleted items so a parent can offer undo
+    let deletedItems = offsets.map { flashcards[$0] }
+    // Notify parent before mutating
+    onDelete?(deletedItems, offsets)
+    // Update the bound array, deleting the selected elements.
+    flashcards.remove(atOffsets: offsets)
     }
 }
 
