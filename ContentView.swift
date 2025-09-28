@@ -31,21 +31,26 @@ struct ContentView: View {
             }
             .navigationTitle("Decks")
             .toolbar {
-                Button(action: {showingRemoveDeck = true}){
-                    Image(systemName: "trash")
-                }
-                Button(action: { showingAddDeck = true }) {
-                    Image(systemName: "plus")
-                }
-                .sheet(isPresented: $showingAddDeck) {
-                    AddDeckView { name in
-                        store.addDeck(name: name)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showingRemoveDeck = true }){
+                        Image(systemName: "trash")
                     }
                 }
-                .sheet(isPresented: $showingRemoveDeck) {
-                    RemoveDeckView(decks: $store.decks)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showingAddDeck = true }) {
+                        Image(systemName: "plus")
+                    }
                 }
             }
+        }
+        // Attach sheets to the main view so they receive the correct bindings
+        .sheet(isPresented: $showingAddDeck) {
+            AddDeckView { name in
+                store.addDeck(name: name)
+            }
+        }
+        .sheet(isPresented: $showingRemoveDeck) {
+            RemoveDeckView(decks: $store.decks)
         }
     }
 }
