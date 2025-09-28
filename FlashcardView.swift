@@ -63,7 +63,7 @@ struct FlashcardView: View {
             .rotation3DEffect(.degrees(rotation), axis: (x: 0, y: 1, z: 0))
             .offset(x: offsetX) // follow finger or animate off
             .rotationEffect(.degrees(Double(offsetX / 20)))
-            .opacity(1 - min(abs(offsetX) / 400, 0.6))
+            .opacity(1.0 - min(Double(abs(offsetX)) / 400.0, 0.6))
             .onTapGesture {
                 withAnimation(.easeInOut(duration: 0.6)) {
                     rotation += 180
@@ -83,7 +83,7 @@ struct FlashcardView: View {
                         if value.translation.width < -threshold {
                             // swipe left -> animate off to the left
                             withAnimation(.spring()) {
-                                offsetX = -UIScreen.main.bounds.width
+                                offsetX = -geo.size.width
                                 isSwipedAway = true
                             }
                             // haptic feedback
@@ -97,7 +97,7 @@ struct FlashcardView: View {
                         } else if value.translation.width > threshold {
                             // swipe right -> animate off to the right
                             withAnimation(.spring()) {
-                                offsetX = UIScreen.main.bounds.width
+                                offsetX = geo.size.width
                                 isSwipedAway = true
                             }
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
