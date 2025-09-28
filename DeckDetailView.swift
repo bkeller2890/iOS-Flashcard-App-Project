@@ -17,6 +17,7 @@ struct DeckDetailView: View {
     @State private var lastDeletedCards: [FlashcardStruct] = []
     @State private var lastDeletedOffsets: IndexSet = IndexSet()
     @State private var showingUndoAlert = false
+    // showingReview removed; using visible NavigationLink instead
     
     var body: some View {
         VStack {
@@ -61,6 +62,18 @@ struct DeckDetailView: View {
                     Image(systemName: "trash")
                 }
             }
+            ToolbarItem(placement: .principal) {
+                    // Visible NavigationLink as toolbar item
+                    NavigationLink {
+                        let progressBinding = Binding<Int>(
+                            get: { store.reviewProgress[deck.id] ?? 0 },
+                            set: { store.reviewProgress[deck.id] = $0 }
+                        )
+                        ReviewView(deck: deck, currentIndex: progressBinding)
+                    } label: {
+                        Text("Review")
+                    }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showingAddCard = true }) {
                     Image(systemName: "plus")
@@ -82,6 +95,8 @@ struct DeckDetailView: View {
                 showingUndoAlert = true
             }
         }
+        // Push ReviewView onto the navigation stack
+    // Removed sheet-based review presentation; navigation link in toolbar now pushes ReviewView
         .alert("Cards deleted", isPresented: $showingUndoAlert) {
             Button("Undo", role: .cancel) {
                 undoDeletion()
