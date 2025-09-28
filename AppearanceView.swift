@@ -22,7 +22,8 @@ struct AppearanceView: View {
         Form {
             Section(header: Text("Appearance")) {
                 Picker("Appearance", selection: $appearance) {
-                    ForEach(AppearanceOption.allCases) { option in
+                    // Show only Light and Dark in the UI; keep System as a possible stored value
+                    ForEach(AppearanceOption.allCases.filter { $0 != .system }) { option in
                         Text(option.label).tag(option.rawValue)
                     }
                 }
