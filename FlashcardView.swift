@@ -14,7 +14,8 @@ struct FlashcardView: View {
     
     @State private var flipped = false
     @State private var rotation = 0.0
-    @GestureState private var dragOffset: CGFloat = 0
+    @State private var offsetX: CGFloat = 0
+    @State private var isSwipedAway = false
     
     var body: some View {
         GeometryReader { geo in
@@ -60,8 +61,9 @@ struct FlashcardView: View {
             }
             .frame(width: geo.size.width * 0.85, height: geo.size.height * 0.6)
             .rotation3DEffect(.degrees(rotation), axis: (x: 0, y: 1, z: 0))
-            .offset(x: dragOffset) // follow finger
-            .animation(.spring(), value: dragOffset)
+            .offset(x: offsetX) // follow finger or animate off
+            .rotationEffect(.degrees(Double(offsetX / 20)))
+            .opacity(1 - min(abs(offsetX) / 400, 0.6))
             .onTapGesture {
                 withAnimation(.easeInOut(duration: 0.6)) {
                     rotation += 180
@@ -72,16 +74,41 @@ struct FlashcardView: View {
             }
             .gesture(
                 DragGesture()
-                    .updating($dragOffset) { value, state, _ in
-                        state = value.translation.width
+                    .onChanged { value in
+                        // follow the finger
+                        offsetX = value.translation.width
                     }
                     .onEnded { value in
-                        if value.translation.width < -100 {
-                            // swiped left
-                            onSwipeLeft?()
-                        } else if value.translation.width > 100 {
-                            // swiped right
-                            onSwipeRight?()
+                        let threshold: CGFloat = 120
+                        if value.translation.width < -threshold {
+                            // swipe left -> animate off to the left
+                            withAnimation(.spring()) {
+                                offsetX = -UIScreen.main.bounds.width
+                                isSwipedAway = true
+                            }
+                            // haptic feedback
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                onSwipeLeft?()
+                                // reset position for reuse
+                                offsetX = 0
+                                isSwipedAway = false
+                            }
+                        } else if value.translation.width > threshold {
+                            // swipe right -> animate off to the right
+                            withAnimation(.spring()) {
+                                offsetX = UIScreen.main.bounds.width
+                                isSwipedAway = true
+                            }
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                onSwipeRight?()
+                                offsetX = 0
+                                isSwipedAway = false
+                            }
+                        } else {
+                            // not far enough -> spring back
+                            withAnimation(.interactiveSpring()) { offsetX = 0 }
                         }
                     }
             )
