@@ -3,6 +3,7 @@
 //  Flashcard
 //
 //  Created by Benjamin Keller on 9/27/25.
+//  Edited on 9/29/2025
 //
 
 import SwiftUI
@@ -10,6 +11,7 @@ import SwiftUI
 struct DeckDetailView: View {
     var deck: FlashcardDeck
     @ObservedObject var store: FlashcardStore
+    
     @State private var currentIndex = 0
     @State private var showingAnswer = false
     @State private var showingAddCard = false
@@ -17,21 +19,37 @@ struct DeckDetailView: View {
     @State private var lastDeletedCards: [FlashcardStruct] = []
     @State private var lastDeletedOffsets: IndexSet = IndexSet()
     @State private var showingUndoAlert = false
-    // showingReview removed; using visible NavigationLink instead
+    
+    @State private var shuffleEnabled = false
+    @State private var shuffledCards: [FlashcardStruct] = []
+    
+    @State private var showFavoritesOnly = false
     
     var body: some View {
         VStack {
-            if !deck.flashcards.isEmpty {
-                let card = deck.flashcards[currentIndex]
+            let allCards = shuffleEnabled ? shuffledCards : deck.flashcards
+            let cards = showFavoritesOnly ? allCards.filter { $0.isFavorite } : allCards
+            
+            if !cards.isEmpty {
+                let card = cards[currentIndex]
                 
-                Text(showingAnswer ? card.answer : card.question)
-                    .font(.headline)
-                    .foregroundColor(.black)
-                    .frame(width: 300, height: 180)
-                    .background(Color.blue)
-                    .cornerRadius(12)
-                    .shadow(radius: 4)
-                    .padding()
+                ZStack(alignment: .topTrailing) {
+                    Text(showingAnswer ? card.answer : card.question)
+                        .font(.headline)
+                        .foregroundColor(.black)
+                        .frame(width: 300, height: 180)
+                        .background(card.cardColor)
+                        .cornerRadius(12)
+                        .shadow(radius: 4)
+                        .padding()
+                    
+                    // ⭐ Favorite toggle button
+                    Button(action: { toggleFavorite(for: card) }) {
+                        Image(systemName: card.isFavorite ? "star.fill" : "star")
+                            .foregroundColor(card.isFavorite ? .yellow : .gray)
+                            .padding()
+                    }
+                }
                 
                 if !showingAnswer {
                     Button("Show Answer") {
@@ -41,12 +59,12 @@ struct DeckDetailView: View {
                 } else {
                     HStack {
                         Button("I Got It Wrong") {
-                            goToNextCard()
+                            goToNextCard(cards: cards)
                         }
                         .buttonStyle(.bordered)
                         
                         Button("I Got It Right") {
-                            goToNextCard()
+                            goToNextCard(cards: cards)
                         }
                         .buttonStyle(.borderedProminent)
                     }
@@ -63,56 +81,63 @@ struct DeckDetailView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                    // Visible NavigationLink as toolbar item
-                    NavigationLink {
-                        let progressBinding = Binding<Int>(
-                            get: { store.reviewProgress[deck.id] ?? 0 },
-                            set: { store.reviewProgress[deck.id] = $0 }
-                        )
-                        ReviewView(deck: deck, currentIndex: progressBinding)
-                    } label: {
-                        Text("Review")
-                    }
+                NavigationLink {
+                    let progressBinding = Binding<Int>(
+                        get: { store.reviewProgress[deck.id] ?? 0 },
+                        set: { store.reviewProgress[deck.id] = $0 }
+                    )
+                    ReviewView(deck: deck, currentIndex: progressBinding)
+                } label: {
+                    Text("Review")
+                }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showingAddCard = true }) {
-                    Image(systemName: "plus")
+                HStack {
+                    Button(action: { showingAddCard = true }) {
+                        Image(systemName: "plus")
+                    }
+                    
+                    Button(action: toggleShuffle) {
+                        Image(systemName: shuffleEnabled ? "shuffle.circle.fill" : "shuffle.circle")
+                    }
+                    
+                    // NEW filter favorites button
+                    Button(action: { showFavoritesOnly.toggle() }) {
+                        Image(systemName: showFavoritesOnly ? "star.fill" : "star")
+                            .foregroundColor(.yellow)
+                    }
                 }
             }
         }
-        // Present add / remove sheets from the view so they have the correct bindings
         .sheet(isPresented: $showingAddCard) {
-            AddFlashcardView { question, answer in
-                store.addFlashcard(to: deck, question: question, answer: answer)
+            AddFlashcardView { question, answer, cardColorHex in
+                store.addFlashcard(to: deck,
+                                   question: question,
+                                   answer: answer,
+                                   cardColorHex: cardColorHex)
             }
         }
         .sheet(isPresented: $showingRemoveFlashcards) {
             RemoveFlashcardView(flashcards: flashcardsBinding) { deleted, offsets in
-                // capture for undo
                 lastDeletedCards = deleted
                 lastDeletedOffsets = offsets
-                // show undo option
                 showingUndoAlert = true
             }
         }
-        // Push ReviewView onto the navigation stack
-    // Removed sheet-based review presentation; navigation link in toolbar now pushes ReviewView
         .alert("Cards deleted", isPresented: $showingUndoAlert) {
-            Button("Undo", role: .cancel) {
-                undoDeletion()
-            }
+            Button("Undo", role: .cancel) { undoDeletion() }
             Button("OK", role: .none) {
-                // clear buffer if user accepts deletion
                 lastDeletedCards = []
                 lastDeletedOffsets = IndexSet()
             }
         } message: {
             Text("Flashcards were deleted. Undo?")
         }
+        .onAppear {
+            shuffledCards = deck.flashcards.shuffled()
+        }
     }
-
-    /// Binding that points to this deck's flashcards inside the store.
-    /// Falls back to an empty constant array if the deck isn't found.
+    
     private var flashcardsBinding: Binding<[FlashcardStruct]> {
         if let idx = store.decks.firstIndex(where: { $0.id == deck.id }) {
             return Binding(
@@ -123,16 +148,11 @@ struct DeckDetailView: View {
             return .constant([])
         }
     }
-
-    // If the user chooses undo, reinsert deleted cards at the appropriate offsets
+    
     private func undoDeletion() {
         guard !lastDeletedCards.isEmpty,
               let idx = store.decks.firstIndex(where: { $0.id == deck.id }) else { return }
-
-        // Rebuild the deck's flashcards inserting each deleted card at the first offset
-        // Note: For simplicity, insert deleted items at the start of the first offset.
         var cards = store.decks[idx].flashcards
-        // Sort offsets and pair them with deleted items; insert in increasing order
         let sortedOffsets = lastDeletedOffsets.sorted()
         for (i, offset) in sortedOffsets.enumerated() {
             let item = i < lastDeletedCards.count ? lastDeletedCards[i] : lastDeletedCards.last!
@@ -140,17 +160,36 @@ struct DeckDetailView: View {
             cards.insert(item, at: insertIndex)
         }
         store.decks[idx].flashcards = cards
-        // clear the undo buffer
         lastDeletedCards = []
         lastDeletedOffsets = IndexSet()
     }
     
-    private func goToNextCard() {
+    private func goToNextCard(cards: [FlashcardStruct]) {
         showingAnswer = false
-        if currentIndex < deck.flashcards.count - 1 {
+        if currentIndex < cards.count - 1 {
             currentIndex += 1
         } else {
-            currentIndex = 0 // loop back
+            currentIndex = 0
+            if shuffleEnabled {
+                shuffledCards = deck.flashcards.shuffled()
+            }
         }
+    }
+    
+    private func toggleShuffle() {
+        shuffleEnabled.toggle()
+        currentIndex = 0
+        if shuffleEnabled {
+            shuffledCards = deck.flashcards.shuffled()
+        }
+    }
+    
+    // ⭐ Toggle favorite state
+    private func toggleFavorite(for card: FlashcardStruct) {
+        guard let deckIndex = store.decks.firstIndex(where: { $0.id == deck.id }),
+              let cardIndex = store.decks[deckIndex].flashcards.firstIndex(where: { $0.id == card.id }) else {
+            return
+        }
+        store.decks[deckIndex].flashcards[cardIndex].isFavorite.toggle()
     }
 }

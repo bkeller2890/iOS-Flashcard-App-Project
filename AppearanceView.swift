@@ -1,3 +1,10 @@
+//
+//  AppearanceView.swift
+//  Flashcard
+//
+//  Created by Benjamin Keller on 9/28/25.
+//
+
 import SwiftUI
 
 enum AppearanceOption: String, CaseIterable, Identifiable {

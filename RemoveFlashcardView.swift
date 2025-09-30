@@ -3,6 +3,7 @@
 //  Flashcard
 //
 //  Created by Benjamin Keller on 9/27/25.
+//  Edited on 9/28/25
 //
 
 
@@ -53,8 +54,8 @@ struct RemoveFlashcardView: View {
         }
     }
     
-    /// Function to handle the list deletion operation.
-    /// It receives an IndexSet of items to be removed.
+    // Function to handle the list deletion operation.
+    // It receives an IndexSet of items to be removed.
     func deleteFlashcards(offsets: IndexSet) {
     // Capture deleted items so a parent can offer undo
     let deletedItems = offsets.map { flashcards[$0] }
@@ -71,9 +72,9 @@ struct RemoveFlashcardView: View {
     // Container needed to hold the @State array for the @Binding to work in the preview
     struct RemoveFlashcardViewContainer: View {
         @State private var cards: [FlashcardStruct] = [
-            FlashcardStruct(question: "What is the capital of France?", answer: "Paris"),
-            FlashcardStruct(question: "Who wrote 'Romeo and Juliet'?", answer: "Shakespeare"),
-            FlashcardStruct(question: "Formula for water?", answer: "H₂O")
+            FlashcardStruct(question: "What is the capital of France?", answer: "Paris", cardColorHex: "FF5733"),
+            FlashcardStruct(question: "Who wrote 'Romeo and Juliet'?", answer: "Shakespeare", cardColorHex: "33FF57"),
+            FlashcardStruct(question: "Formula for water?", answer: "H₂O", cardColorHex: "3357FF")
         ]
         
         var body: some View {
@@ -83,3 +84,4 @@ struct RemoveFlashcardView: View {
     
     return RemoveFlashcardViewContainer()
 }
+

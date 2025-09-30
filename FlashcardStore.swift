@@ -2,10 +2,11 @@
 //  Flashcard
 //
 //  Created by Benjamin Keller on 9/27/25.
+//  Edited on 9/28/25 
 //
 
 import Foundation
-internal import Combine
+import Combine
 
 class FlashcardStore: ObservableObject {
    
@@ -33,10 +34,12 @@ class FlashcardStore: ObservableObject {
            decks.append(newDeck)
        }
        
-       func addFlashcard(to deck: FlashcardDeck, question: String, answer: String) {
+    func addFlashcard(to deck: FlashcardDeck, question: String, answer: String, cardColorHex: String ) {
            if let index = decks.firstIndex(where: { $0.id == deck.id }) {
-               let newCard = FlashcardStruct(question: question, answer: answer)
-               decks[index].flashcards.append(newCard)
+               var deckToUpdate = decks[index]
+               let newCard = FlashcardStruct(question: question, answer: answer, cardColorHex: cardColorHex)
+               deckToUpdate.flashcards.append(newCard)
+               decks[index] = deckToUpdate
            }
        }
        
@@ -67,3 +70,4 @@ class FlashcardStore: ObservableObject {
        }
     
 }
+
